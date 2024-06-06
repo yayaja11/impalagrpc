@@ -17,14 +17,14 @@ import torch.nn as nn
 from torch.distributions import Categorical
 import numpy as np
 import threading
-
-UNROLL_SIZE = 100
-PARAMETER_REQUEST_INTERVAL = 5
-NUM_ACTOR = 4
+from config import Config as config
 
 class client():
-    def __init__(self):
+    def __init__(self, config):
         self.total_reward = 0
+        self.unroll_size = config.baseconfig.UNROLL_SIZE
+        self.param_interval = config.clientconfig.PARAMETER_REQUEST_INTERVAL
+        
 
     def create_state(self, values):
         state = impala_pb2.State()
@@ -74,12 +74,12 @@ class client():
         return experience_data
 
     def initialize_actor_buffer(self, state_shape, n_action):
-        self.np_state = np.zeros(shape=(UNROLL_SIZE, state_shape)) ### 한ep돌고 제대로 다시 0으로 체워지는지 체크
-        self.np_next_state = np.zeros(shape=(UNROLL_SIZE, state_shape))
-        self.np_reward =np.zeros(shape=(UNROLL_SIZE, 1))
-        self.np_done =np.zeros(shape=(UNROLL_SIZE, 1))
-        self.np_action =np.zeros(shape=(UNROLL_SIZE, 1))
-        self.np_action_prob = np.zeros(shape=(UNROLL_SIZE,n_action))
+        self.np_state = np.zeros(shape=(self.unroll_size, state_shape)) ### 한ep돌고 제대로 다시 0으로 체워지는지 체크
+        self.np_next_state = np.zeros(shape=(self.unroll_size, state_shape))
+        self.np_reward =np.zeros(shape=(self.unroll_size, 1))
+        self.np_done =np.zeros(shape=(self.unroll_size, 1))
+        self.np_action =np.zeros(shape=(self.unroll_size, 1))
+        self.np_action_prob = np.zeros(shape=(self.unroll_size,n_action))
 
     def update_actor_buffer(self, state, action, action_prob, reward, done, next_state, t):
         self.np_state[t, :] = state
@@ -99,7 +99,7 @@ class client():
                 # 모델 업데이트 로직 구현
             except grpc.RpcError as e:
                 print("Failed to retrieve parameters:", e)
-            time.sleep(PARAMETER_REQUEST_INTERVAL)
+            time.sleep(self.param_interval)
 
     def run_actor(self, actor_id):
         # time.sleep(int(actor_id))
@@ -121,7 +121,7 @@ class client():
             seed = random.randint(0, 10000)
             state = self.actor.env.reset(seed=seed)[0]
             self.initialize_actor_buffer(state_shape, n_action)   
-            for t in range(UNROLL_SIZE):
+            for t in range(self.unroll_size):
                 action_prob, v = self.actor.net(torch.Tensor(state))
                 dists = Categorical(action_prob)
                 action = dists.sample().item()
@@ -154,8 +154,8 @@ class client():
 
 if __name__ == '__main__':
     processes = []
-    client_manager = client()    
-    for i in range(1, NUM_ACTOR+1):
+    client_manager = client(config)    
+    for i in range(1, config.clientconfig.NUM_ACTOR+1):
         p = multiprocessing.Process(target=client_manager.run_actor, args=(i,))
         p.start()
         processes.append(p)
@@ -163,7 +163,6 @@ if __name__ == '__main__':
     for p in processes:
         p.join()
             
-
 
 class ForkablePdb(pdb.Pdb):
 

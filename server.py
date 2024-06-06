@@ -50,33 +50,28 @@ import json
 import numpy as np
 import time
 import threading
+from config import Config as config
 
-REPLAY_BUFFER_SIZE = 2000
-LEARNING_RATE = 0.0006
-UNROLL_SIZE = 100
-BATCH_SIZE = 64
-LEARNING_FREQ = 5
-C_THRESHOLD = 1.0
-RHO_THRESHOLD = 1.0
-GAMMA = 0.98
-BASELINE_LOSS_SCALING = 0.5
-ENTROPY_COEFFICIENT = 0.01
 
 class ImpalaService(impala_pb2_grpc.ImpalaServiceServicer):
-    def __init__(self, learner:learner):
+    def __init__(self, learner:learner, config):
         self.total_experiences = 0
         self.critic = learner
         self.state_shape = self.critic.state_shape
         self.n_action = self.critic.n_action
         self.start_time = time.time()
+        self.learning_freq = config.serverconfig.LEARNING_FREQ
+        self.unroll_size = config.baseconfig.UNROLL_SIZE
+        
+        
         self.learning_schedule()
         
         self.save_weight(self.critic.net.state_dict())
         
     def learning_schedule(self):
-        learning_timer = threading.Timer(LEARNING_FREQ, self.critic_learning)
+        learning_timer = threading.Timer(self.learning_freq, self.critic_learning)
         learning_timer.start()
-        critic_test = threading.Timer(LEARNING_FREQ, self.critic.test)
+        critic_test = threading.Timer(self.learning_freq, self.critic.test)
         critic_test.start()
         
     def critic_learning(self):
@@ -90,13 +85,13 @@ class ImpalaService(impala_pb2_grpc.ImpalaServiceServicer):
 
     def convert_experience_to_cpprb(self, experience):
         # batch_id = time.time() - self.start_time        
-        list_state = np.zeros(shape=(UNROLL_SIZE, self.state_shape)) ### 한ep돌고 제대로 다시 0으로 체워지는지 체크
-        list_next_state = np.zeros(shape=(UNROLL_SIZE, self.state_shape))
-        list_reward =np.zeros(shape=(UNROLL_SIZE, 1))
-        list_done =np.zeros(shape=(UNROLL_SIZE, 1))
-        list_truncated = np.zeros(shape=(UNROLL_SIZE, 1))
-        list_action =np.zeros(shape=(UNROLL_SIZE, 1))
-        list_action_prob = np.zeros(shape=(UNROLL_SIZE, self.n_action))
+        list_state = np.zeros(shape=(self.unroll_size, self.state_shape)) ### 한ep돌고 제대로 다시 0으로 체워지는지 체크
+        list_next_state = np.zeros(shape=(self.unroll_size, self.state_shape))
+        list_reward =np.zeros(shape=(self.unroll_size, 1))
+        list_done =np.zeros(shape=(self.unroll_size, 1))
+        list_truncated = np.zeros(shape=(self.unroll_size, 1))
+        list_action =np.zeros(shape=(self.unroll_size, 1))
+        list_action_prob = np.zeros(shape=(self.unroll_size, self.n_action))
         # list_batch_id = np.zeros(shape=(UNROLL_SIZE, 1))
         exp_count = experience.experience_count + 1
         
@@ -130,9 +125,8 @@ def run_critic():
         options=[
             ('grpc.max_receive_message_length', 10 * 1024 * 1024)  
         ])
-    critic = learner(UNROLL_SIZE, BATCH_SIZE, LEARNING_RATE, C_THRESHOLD, 
-                     RHO_THRESHOLD, GAMMA, BASELINE_LOSS_SCALING, ENTROPY_COEFFICIENT, REPLAY_BUFFER_SIZE)
-    impala_service = ImpalaService(learner=critic)
+    critic = learner(config)
+    impala_service = ImpalaService(learner=critic, config=config)
     impala_pb2_grpc.add_ImpalaServiceServicer_to_server(impala_service, server)
     server.add_insecure_port('127.0.0.1:50051')
     server.start() 

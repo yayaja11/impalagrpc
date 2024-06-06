@@ -11,24 +11,22 @@ import numpy as np
 import time
 from torch.utils.tensorboard import SummaryWriter
 
-
 class learner(nn.Module):
-    def __init__(self, UNROLL_SIZE, BATCH_SIZE, LEARNING_RATE, C_THRESHOLD=1,
-                 RHO_THRESHOLD=1, GAMMA=0.98, BASELINE_LOSS_SCALING=0.5, ENTROPY_COEFFICIENT=0.01, REPLAY_BUFFER_SIZE=1000):
+    def __init__(self, config):
         super(learner, self).__init__()
         self.writer = SummaryWriter(f'runs/learner_logs{time.time()}')
         self.global_step = 0
-        self.replay_buffer_size = REPLAY_BUFFER_SIZE
+        self.replay_buffer_size = config.serverconfig.REPLAY_BUFFER_SIZE
         self.test_ep_len = 0 
         
-        self.unroll_size = UNROLL_SIZE
-        self.batch_size = BATCH_SIZE
-        self.learning_rate = LEARNING_RATE  
-        self.c_threshold = C_THRESHOLD
-        self.rho_threshold = RHO_THRESHOLD
-        self.gamma = GAMMA
-        self.baseline_loss_scaling = BASELINE_LOSS_SCALING
-        self.ent_coeff = ENTROPY_COEFFICIENT
+        self.unroll_size = config.baseconfig.UNROLL_SIZE
+        self.batch_size = config.serverconfig.BATCH_SIZE
+        self.learning_rate = config.serverconfig.LEARNING_RATE  
+        self.c_threshold = config.serverconfig.C_THRESHOLD
+        self.rho_threshold = config.serverconfig.RHO_THRESHOLD
+        self.gamma = config.serverconfig.GAMMA
+        self.baseline_loss_scaling = config.serverconfig.BASELINE_LOSS_SCALING
+        self.ent_coeff = config.serverconfig.ENTROPY_COEFFICIENT
         
         self.k_epoch = 3
         
