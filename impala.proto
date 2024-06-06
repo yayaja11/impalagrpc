@@ -1,0 +1,55 @@
+syntax = "proto3";
+
+package impala;
+
+service ImpalaService {
+  rpc CheckConnection(Empty) returns (ConnectionStatus) {}
+  rpc SendExperience(ExperienceRequest) returns (Empty) {}
+  rpc RequestParameter(Empty) returns (ParameterResponse) {}
+}
+
+message Empty {}
+
+message ConnectionStatus {
+  bool connected = 1;
+}
+
+message State {
+    repeated double values = 1;
+}
+
+message Action {
+    double value = 1;
+}
+
+message ActionProb {
+    repeated double probs = 1;
+}
+
+message Reward {
+    double value = 1;
+}
+
+message Done {
+    bool value = 1;
+}
+
+message ExperienceData {
+    repeated State state = 1;
+    repeated Action action = 2;
+    repeated ActionProb action_prob = 3;
+    repeated Reward reward = 4;
+    repeated Done done = 5;
+    repeated State next_state = 6;
+    int32 experience_count = 7;
+}
+
+message ExperienceRequest {
+  int32 count = 1;
+  ExperienceData experience = 2;
+  int32 actor_id = 3;
+}
+
+message ParameterResponse {
+  bytes parameter = 1;
+}
