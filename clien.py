@@ -95,8 +95,7 @@ class client():
                 response = stub.RequestParameter(impala_pb2.Empty())
                 new_weights = dill.loads(response.parameter)
                 self.actor.net.load_state_dict(new_weights)
-                print("Updated parameters received")
-                # 모델 업데이트 로직 구현
+                # print("Updated parameters received")
             except grpc.RpcError as e:
                 print("Failed to retrieve parameters:", e)
             time.sleep(self.param_interval)
@@ -104,7 +103,7 @@ class client():
     def run_actor(self, actor_id):
         # time.sleep(int(actor_id))
         self.actor_id = actor_id
-        channel = grpc.insecure_channel('127.0.0.1:50051', compression=grpc.Compression.Gzip)
+        channel = grpc.insecure_channel('127.0.0.1:50052', compression=grpc.Compression.Gzip)
         stub = impala_pb2_grpc.ImpalaServiceStub(channel)
         self.actor = Agent()
         

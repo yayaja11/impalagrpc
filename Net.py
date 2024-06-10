@@ -24,7 +24,8 @@ class ActorCritic(nn.Module):
             nn.Linear(64 , 32),
             nn.ReLU(), 
             nn.Linear(32, 1)
-            )            
+            )  
+                  
     def forward(self, x):
         prob = self.actor(x)
         v = self.critic(x)

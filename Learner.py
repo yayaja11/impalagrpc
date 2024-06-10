@@ -28,7 +28,7 @@ class learner(nn.Module):
         self.baseline_loss_scaling = config.serverconfig.BASELINE_LOSS_SCALING
         self.ent_coeff = config.serverconfig.ENTROPY_COEFFICIENT
         
-        self.k_epoch = 3
+        self.k_epoch = 1  
         
         
         self.env = gym.make('CartPole-v1')
@@ -54,7 +54,7 @@ class learner(nn.Module):
         
      
     def calculate_vtrace(self, dist, old_dist, dist_actor, old_v, v, next_v, action, reward, done):        
-        ratio = torch.exp(dist.log_prob(action) - old_dist.log_prob(action))
+        ratio = torch.exp(dist.log_prob(action) - dist_actor.log_prob(action))
         
         clipped_rho = torch.clamp(ratio, None , max=self.rho_threshold)
         clipped_c = torch.clamp(ratio, None , max=self.c_threshold)
@@ -83,6 +83,7 @@ class learner(nn.Module):
         # try:
         
         # PPO
+        self.net.train()
         batch_start_time = time.time()
         try:
             experience = self.memory.sample(self.batch_size)
@@ -118,30 +119,44 @@ class learner(nn.Module):
 
                 critic_loss = self.baseline_loss_scaling * F.mse_loss(v, v_trace)
                 entropy_loss = ent * self.ent_coeff
-                actor_loss = -(dist.log_prob(action) * adv).mean()
+                
+                
+                ratio = torch.exp(dist.log_prob(action) - dist_act.log_prob(action))
+                surr1 = ratio * adv
+                surr2 = torch.clamp(ratio, 1-0.2, 1+0.2) * adv
+                # PPO
+                actor_loss = - torch.min(surr1, surr2).mean()
+                # actor_loss = -(dist.log_prob(action) * adv).mean()
                 # actor_loss = -(dist.log_prob(action) * adv).mean() + entropy_loss
+    
                 total_loss = actor_loss + critic_loss
                 print("total_loss", total_loss)
                 backward_start_time = time.time()
                 self.optimizer.zero_grad()
                 total_loss.backward()
+                # actor_loss.backward()
+                # critic_loss.backward()
                 self.optimizer.step()
                 
                 backward_time = time.time() - backward_start_time
                 self.writer.add_scalar('Timing/backward_time', backward_time, self.global_step)
                 self.writer.add_scalar('Loss/total_loss', total_loss.item(), self.global_step)
+                self.writer.add_scalar('Loss/actor_loss', actor_loss.item(), self.global_step)
+                self.writer.add_scalar('Loss/critic_loss', critic_loss.item(), self.global_step)
                 self.writer.add_scalar('Loss/critic_loss', critic_loss.item(), self.global_step)
                 self.writer.add_scalar('Entropy/entropy', entropy_loss.item(), self.global_step)
-                self.writer.add_scalar('testepi', self.test_ep_len, self.global_step)
+                self.writer.add_scalar('Loss/reward', self.test_ep_len, self.global_step)
                 self.global_step += 1
         except Exception as e:
             print("not enough experience")
             print(e)
             time.sleep(5)
+        self.old_net.load_state_dict(self.net.state_dict())
             
     def test(self):
         state = self.env.reset()[0]
         for i in range(10000):
+            self.net.eval()
             prob, v = self.net(torch.Tensor(state).to("cuda"))
             dists = Categorical(prob)
             action = dists.sample().item()
@@ -153,3 +168,4 @@ class learner(nn.Module):
                 break
         self.test_ep_len = i
         self.env.close()        
+        

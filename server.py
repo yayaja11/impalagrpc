@@ -1,40 +1,4 @@
-# from concurrent import futures
-# import grpc
-# import impala_pb2
-# import impala_pb2_grpc
-
-# class ImpalaService(impala_pb2_grpc.ImpalaServiceServicer):
-#     def __init__(self) -> None:
-#         self.data_count: int = 0
-#         self.parameters: list[str] = ['a', 'b', 'c', 'd', 'e']
-#         self.current_parameter_index: int = 0
-
-#     def CheckConnection(self, request, context) -> impala_pb2.ConnectionStatus:
-#         return impala_pb2.ConnectionStatus(connected=True)
-
-#     def SendExperience(self, request, context) -> impala_pb2.Empty:
-#         self.data_count += request.count
-#         if self.data_count >= 1000:
-#             print(f"Total experiences received: {self.data_count}")
-#             self.data_count = 0  # Reset after processing
-#         return impala_pb2.Empty()
-
-#     def RequestParameter(self, request, context)-> impala_pb2.ParameterResponse:
-#         parameter = self.parameters[self.current_parameter_index]
-#         self.current_parameter_index = (self.current_parameter_index + 1) % len(self.parameters)
-#         return impala_pb2.ParameterResponse(parameter=parameter)
-
-# def serve() -> None:
-#     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
-#     impala_pb2_grpc.add_ImpalaServiceServicer_to_server(ImpalaService(), server)
-#     server.add_insecure_port('59.14.117.221:50051')
-#     server.start()
-#     server.wait_for_termination()
-
-# if __name__ == '__main__':
-#     serve()
-    
-    
+   
 from concurrent import futures
 import grpc
 import impala_pb2
@@ -128,10 +92,10 @@ def run_critic():
     critic = learner(config)
     impala_service = ImpalaService(learner=critic, config=config)
     impala_pb2_grpc.add_ImpalaServiceServicer_to_server(impala_service, server)
-    server.add_insecure_port('127.0.0.1:50051')
+    server.add_insecure_port('127.0.0.1:50052')
     server.start() 
     
-    print("Server started. Listening on port 50051.")
+    print("Server started. Listening on port 50052.")
     server.wait_for_termination()
 
 if __name__ == '__main__':

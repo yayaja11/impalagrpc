@@ -11,8 +11,6 @@ import numpy as np
 
 from torch.utils.tensorboard import SummaryWriter
 
-UNROLL_SIZE = 100
-
 
 class Agent(nn.Module):
     def __init__(self):
@@ -24,33 +22,12 @@ class Agent(nn.Module):
         self.act_count = 0
         self.net = ActorCritic(state_shape, n_action) 
         
-        # self.memory = ReplayBuffer(buffer_size, env_dict = {
-        #                 "state": {"shape": (unroll_size, state_shape)},
-        #                 "action": {"shape": (unroll_size, 1,)},
-        #                 "action_prob": {"shape": (unroll_size, 2)}, 
-        #                 "reward": {"shape": (unroll_size, 1)},
-        #                 "done": {"shape": (unroll_size, 1)},
-        #                 "next_state": {"shape": (unroll_size, state_shape)},
-        #             })
-
     def act(self, state):
         self.act_count += 1
         prob, v = self.net(torch.Tensor(state)) ### torch
         dists = Categorical(prob)        
         action = dists.sample()
         return action, v
-        
-    # def save_traj(self, state, action, action_prob, reward, done, next_state):
-    #     # action_prob_t = torch.stack(action_prob)
-    #     # import pdb; pdb.set_trace()
-    #     self.memory.add(
-    #         state=state, action=action, action_prob = action_prob,
-    #         reward=reward, done=done, next_state=next_state)
-
-
-
-
-
 
 
 
