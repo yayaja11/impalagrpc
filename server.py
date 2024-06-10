@@ -68,8 +68,8 @@ class ImpalaService(impala_pb2_grpc.ImpalaServiceServicer):
             list_action_prob[t,:] = experience.action_prob[t].probs
             # list_batch_id[t,:] = batch_id
 
-        self.critic.memory.add(state=list_state, action=list_action, action_prob=list_action_prob, 
-                reward=list_reward, done=list_done, next_state=list_next_state, experience_count=exp_count)
+        self.critic.memory.add_buffer(list_state, list_action, list_action_prob, 
+                list_reward, list_done, list_next_state)
 
     def SendExperience(self, request, context):
         self.convert_experience_to_cpprb(request.experience)

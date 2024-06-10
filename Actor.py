@@ -5,7 +5,6 @@ import torch
 import torch.nn as nn
 from Net import ActorCritic
 import gym
-from cpprb import ReplayBuffer
 from torch.distributions import Categorical
 import numpy as np
 

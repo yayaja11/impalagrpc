@@ -5,11 +5,51 @@ import torch.nn.functional as F
 import torch.optim as optim
 from Net import ActorCritic
 import gym
-from cpprb import ReplayBuffer
+from collections import deque
 from torch.distributions import Categorical
 import numpy as np
 import time
 from torch.utils.tensorboard import SummaryWriter
+import random
+
+class Memory(object):
+    def __init__(self, capacity):
+        self.capacity = capacity
+        self.data = deque(maxlen=self.capacity)
+        self.count = 0
+
+    def buffer_count(self):
+        return self.count
+
+    def add_buffer(self,state, action,old_log_prob, reward,done, next_state):
+
+        transition = (state, action, old_log_prob, reward, done, next_state)
+
+        if self.count < self.capacity - 10:
+            self.data.append(transition)
+            self.count += 1
+        else:
+            self.data.popleft()
+            self.data.append(transition)
+
+    def sample_batch(self, batch_size):
+        if self.count < batch_size:
+            batch = random.sample(self.data, self.count)
+        else:
+            batch = random.sample(self.data, batch_size)
+        states = np.asarray([i[0] for i in batch], dtype=np.float32)
+        actions = np.asarray([i[1] for i in batch], dtype=np.float32)
+        old_log_probs = np.asarray([i[2] for i in batch], dtype=np.float32)
+        rewards = np.asarray([i[3] for i in batch], dtype=np.float32)
+        dones = np.asarray([i[4] for i in batch], dtype=np.float32)
+        next_states = np.asarray([i[5] for i in batch], dtype=np.float32)
+                
+        return states, actions, old_log_probs, rewards, dones, next_states
+
+    def clear_buffer(self):
+        self.data = deque(maxlen=self.capacity)
+        self.count = 0
+
 
 class learner(nn.Module):
     def __init__(self, config):
@@ -39,16 +79,18 @@ class learner(nn.Module):
         self.old_net = ActorCritic(self.state_shape, self.n_action).to("cuda")  ### for ppo
         self.old_net.load_state_dict(self.net.state_dict())          
         
-        self.memory = ReplayBuffer(self.replay_buffer_size, env_dict = {
-                "state": {"shape": (self.unroll_size, self.state_shape)},
-                "action": {"shape": (self.unroll_size, 1,)},
-                "action_prob": {"shape": (self.unroll_size, 2)}, 
-                "reward": {"shape": (self.unroll_size, 1)},
-                "done": {"shape": (self.unroll_size, 1)},
-                "next_state": {"shape": (self.unroll_size, self.state_shape)},
-                "experience_count": {"shape": (1, 1)} 
-                # "batch_id": {"shape": (self.unroll_size, 1)},
-            })
+        self.memory = Memory(self.replay_buffer_size)
+        # self.memory = ReplayBuffer(self.replay_buffer_size, env_dict = {
+        #         "state": {"shape": (self.unroll_size, self.state_shape)},
+        #         "action": {"shape": (self.unroll_size, 1,)},
+        #         "action_prob": {"shape": (self.unroll_size, 2)}, 
+        #         "reward": {"shape": (self.unroll_size, 1)},
+        #         "done": {"shape": (self.unroll_size, 1)},
+        #         "next_state": {"shape": (self.unroll_size, self.state_shape)},
+        #         "experience_count": {"shape": (1, 1)} 
+        #         # "batch_id": {"shape": (self.unroll_size, 1)},
+        #     })
+        
 
         self.optimizer = optim.Adam(self.net.parameters(), lr=self.learning_rate)
         
@@ -86,17 +128,17 @@ class learner(nn.Module):
         self.net.train()
         batch_start_time = time.time()
         try:
-            experience = self.memory.sample(self.batch_size)
+            experience = self.memory.sample_batch(self.batch_size)
             batch_time = time.time() - batch_start_time
             self.writer.add_scalar('Timing/batch_time', batch_time, self.global_step)
 
             for k in range(self.k_epoch): # PPO
-                state = torch.tensor(experience['state']).transpose(0,1).to("cuda")
-                action = torch.tensor(experience['action']).squeeze().transpose(0,1).to("cuda")
-                action_prob = torch.tensor(experience['action_prob']).squeeze().transpose(0,1).to("cuda")
-                reward = torch.tensor(experience['reward']).squeeze().transpose(0,1).to("cuda")
-                done = torch.tensor(experience['done']).squeeze().transpose(0,1).to("cuda")
-                next_state = torch.tensor(experience['next_state']).transpose(0,1).to("cuda")          
+                state = torch.tensor(experience[0]).transpose(0,1).to("cuda")
+                action = torch.tensor(experience[1]).squeeze().transpose(0,1).to("cuda")
+                action_prob = torch.tensor(experience[2]).squeeze().transpose(0,1).to("cuda")
+                reward = torch.tensor(experience[3]).squeeze().transpose(0,1).to("cuda")
+                done = torch.tensor(experience[4]).squeeze().transpose(0,1).to("cuda")
+                next_state = torch.tensor(experience[5]).transpose(0,1).to("cuda")          
                     
                 forward_start_time = time.time()
                 prob, v = self.net(state)
